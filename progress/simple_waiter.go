@@ -22,50 +22,54 @@ type SimpleWaiterPostFnc func(any)
 // SimpleWaiter displays a progress waiter text animation on the screen until the
 // supplied worker aysnchronously completes the job & return a value over `channel any`
 type SimpleWaiter struct {
-	Fps    int
-	Frames []string
+	fps    int
+	frames []string
+}
+
+type SimpleWaiterOptsFnc func(w *SimpleWaiter)
+
+func WithFps(fps int) SimpleWaiterOptsFnc {
+	return func(w *SimpleWaiter) {
+		w.fps = fps
+	}
+}
+
+func WithWaiterFrames(frames []string) SimpleWaiterOptsFnc {
+	return func(w *SimpleWaiter) {
+		w.frames = frames
+	}
 }
 
 // NewSimpleWaiter creates & returns a SimpleWaiter
-func NewSimpleWaiter(fps int) SimpleWaiter {
-	if fps > 1000 || fps < 0 {
-		fps = 20
+func NewSimpleWaiter(opts ...SimpleWaiterOptsFnc) SimpleWaiter {
+	w := &SimpleWaiter{
+		fps:    20,
+		frames: WaiterFrames1,
 	}
-	return SimpleWaiter{
-		Fps:    fps,
-		Frames: WaiterFrames1,
+
+	for _, opt := range opts {
+		opt(w)
 	}
+
+	return *w
 }
 
-// WaitWithPost calls the wrapped works `fn` & starts a visual Waiter using underlying Wait()
-// method. After the method returns, the results of the underlying worker call returned via the
-// internal quit channel is passed on to the post fnc for any post processing.
-func (w SimpleWaiter) WaitWithPost(fn SimpleWaiterFnc, post SimpleWaiterPostFnc) error {
-	rc, err := w.Wait(fn)
-	if err != nil {
-		return err
-	}
-	post(rc)
-	return nil
-}
+// WaitFor calls the supplied SimpleWaiterFnc & starts a waiter animation using the supplied
+// frames. When the `fn` completes it sends the return data over the channel
+func (w SimpleWaiter) WaitFor(fn SimpleWaiterFnc) (any, error) {
 
-// Wait calls the wrapped worker `fn` & starts a visual Wwaiter. When the fn is done
-// it passes the return data received over the channel to the post fn for processing
-func (w SimpleWaiter) Wait(fn SimpleWaiterFnc) (any, error) {
+	cursor.Off()
 
 	var idx int
-	duration := time.Duration(1000/w.Fps) * time.Millisecond
+	duration := time.Duration(1000/w.fps) * time.Millisecond
 
 	// build a ticker that ticks every xms based on
 	ticker := time.After(duration)
 	rc := make(chan any) // make a quick channel
 
-	// start the waiter func as a go routing
-	cursor.Off()
 	go fn(rc)
 
 	for {
-
 		select {
 		case val := <-rc:
 			cursor.ClearToStartOfLine() // clear this ln
@@ -75,8 +79,8 @@ func (w SimpleWaiter) Wait(fn SimpleWaiterFnc) (any, error) {
 
 		case <-ticker:
 			cursor.Col(1)                   // move cursor to beginning of ln
-			fmt.Print(w.Frames[idx])        // paint the next frame
-			idx = (idx + 1) % len(w.Frames) // move idx
+			fmt.Print(w.frames[idx])        // paint the next frame
+			idx = (idx + 1) % len(w.frames) // move idx
 			ticker = time.After(duration)   // set timer
 		}
 	}

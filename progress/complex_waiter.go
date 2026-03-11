@@ -66,23 +66,24 @@ type ComplexWaiterFnc func(chan WaiterStatus)
 // The supplied template is used to fill out the progress % value & the messages.
 type ComplexWaiter struct {
 	SimpleWaiter
-	Template string
+	template string
 }
 
 // NewComplexWaiter creates & returns a new Progress Waiter
 func NewComplexWaiter() ComplexWaiter {
 	return ComplexWaiter{
-		SimpleWaiter: NewSimpleWaiter(20),
-		Template:     ProgressWaiterTemplate1,
+		SimpleWaiter: NewSimpleWaiter(),
+		template:     ProgressWaiterTemplate1,
 	}
 }
 
-// Wait calls the supplied CompletxWaiterFnc & then receives on the channel for updated
-// status
-func (w ComplexWaiter) Wait(fn ComplexWaiterFnc) (any, error) {
+// WaitFor calls the supplied CompletxWaiterFnc &  waits to receive status on the
+// shared channel. It displays a simple waiter animation or updated status percent
+// complete & message
+func (w ComplexWaiter) WaitFor(fn ComplexWaiterFnc) (any, error) {
 
 	var idx int
-	duration := time.Duration(1000/w.Fps) * time.Millisecond
+	duration := time.Duration(1000/w.fps) * time.Millisecond
 
 	// build a ticker that ticks every xms based on
 	ticker := time.After(duration)
@@ -113,15 +114,15 @@ func (w ComplexWaiter) Wait(fn ComplexWaiterFnc) (any, error) {
 			percent = status.ProgressPercent
 			cursor.ClearToStartOfLine() // clear this ln
 			cursor.Col(1)               // move cursor to beginning of ln
-			fmt.Printf(w.Template, percent, status.Message, "")
+			fmt.Printf(w.template, percent, status.Message, "")
 			lastPercent = percent
 			lastMsg = status.Message
 
 		case <-ticker:
 			cursor.Col(1) // move cursor to beginning of ln
 			// fmt.Print(w.Frames[idx])        // paint the next frame
-			fmt.Printf(w.Template, lastPercent, lastMsg, w.Frames[idx])
-			idx = (idx + 1) % len(w.Frames) // move idx
+			fmt.Printf(w.template, lastPercent, lastMsg, w.frames[idx])
+			idx = (idx + 1) % len(w.frames) // move idx
 			ticker = time.After(duration)   // set timer
 		}
 	}
